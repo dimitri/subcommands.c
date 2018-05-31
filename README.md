@@ -11,6 +11,13 @@ A small single-file based library for common things to do in C:
 The ISC license is an Open Source license used by the OpenBSD project,
 allows users to do about whatever they want to with this code.
 
+## SDS: Simple Dynamic Strings
+
+This library vendors-in the SDS library for dynamic string handling in C.
+The SDS lib is available with a BSD-2-Clause licence.
+
+  https://github.com/antirez/sds
+
 ## commandline.h
 
 A single-file C library to implement command line parsing with commands and

@@ -13,6 +13,7 @@
 
 #include "commandline.h"
 #include "filepaths.h"
+#include "runprogram.h"
 
 static bool ls_opt_all = false;
 static bool ls_opt_long = false;
@@ -37,7 +38,8 @@ static int ls_getopt(int argc, char **argv);
 static void main_cat(int argc, char **argv);
 static int cat_getopt(int argc, char **argv);
 
-static void main_exec(int argc, char **argv);
+static void main_which(int argc, char **argv);
+static void main_echo12(int argc, char **argv);
 
 cmd_t env_cmd_get = make_command("get",
                                  "get env variable value",
@@ -129,16 +131,21 @@ cmd_t ls_cmd = make_command("ls",
 /*                              "cat file", "[-n]", NULL, */
 /*                              &cat_getopt, &main_cat); */
 
-cmd_t exec_cmd = make_command("exec",
-                              "execute command", NULL, NULL,
-                              NULL, &main_exec);
+cmd_t which_cmd = make_command("which",
+							   "run /usr/bin/which", "<program>", NULL,
+							   NULL, &main_which);
+
+cmd_t echo_cmd = make_command("echo",
+							  "run /usr/bin/echo", "<nb>", NULL,
+							  NULL, &main_echo12);
 
 cmd_t *main_cmds[] = {
   &env_cmd,
   &path_cmd,
   &ls_cmd,
   /* &cat_cmd, */
-  &exec_cmd,
+  &which_cmd,
+  &echo_cmd,
   NULL
 };
 
@@ -581,8 +588,112 @@ cat_getopt(int argc, char **argv)
 
 
 static void
-main_exec(int argc, char **argv)
+main_which(int argc, char **argv)
 {
-  fprintf(stdout, "entering %s", __func__);
-  return;
+	if (argc == 1)
+	{
+		Program prog = run_program("/usr/bin/which", argv[0], NULL);
+
+		if (prog.error != 0)
+		{
+			fprintf(stderr, "Failed to run program \"%s\": %s\n",
+					prog.program, strerror(prog.error));
+			fflush(stderr);
+			exit(1);
+		}
+		fprintf(stdout, "%p %ld\n", prog.out, sdslen(prog.out));
+		fprintf(stdout, "%s", prog.out);
+		fprintf(stderr, "%s", prog.err);
+
+		fflush(stdout);
+		fflush(stderr);
+
+		exit(prog.rc);
+	}
+	else
+	{
+		commandline_print_usage(&which_cmd, stderr);
+		exit(1);
+	}
+
+	return;
+}
+
+
+static void
+main_echo12(int argc, char **argv)
+{
+	if (argc == 1)
+	{
+		Program prog;
+		int nb = atoi(argv[0]);
+
+		if (nb == 0 && errno == EINVAL)
+		{
+			fprintf(stderr,
+					"Failed to parse number \"%s\": %s\n",
+					argv[0], strerror(errno));
+			exit(1);
+		}
+
+		switch (nb)
+		{
+			case 1:
+				prog = run_program("/bin/echo", "1", NULL);
+				break;
+
+			case 2:
+				prog = run_program("/bin/echo", "1", "2", NULL);
+				break;
+
+			case 12:
+				prog = run_program("/bin/echo",
+								   "1", "2", "3", "4", "5", "6",
+								   "7", "8", "9", "a", "b", "c",
+								   NULL);
+				break;
+
+			case 13:
+				prog = run_program("/bin/echo",
+								   "1", "2", "3", "4", "5", "6",
+								   "7", "8", "9", "a", "b", "c", "d",
+								   NULL);
+				break;
+
+			case 15:
+				prog = run_program("/bin/echo",
+								   "1", "2", "3", "4", "5", "6",
+								   "7", "8", "9", "a", "b", "c", "d", "e", "f",
+								   NULL);
+				break;
+
+			default:
+				fprintf(stderr, "Number of arguments not supported: %d\n", nb);
+				exit(1);
+				break;
+		}
+
+		if (prog.error != 0)
+		{
+			fprintf(stderr, "Failed to run program \"%s\": %s\n",
+					prog.program, strerror(prog.error));
+			fflush(stderr);
+			exit(1);
+		}
+
+		fprintf(stdout, "%s", prog.out);
+		fprintf(stderr, "%s", prog.err);
+
+		fflush(stdout);
+		fflush(stderr);
+
+		exit(prog.rc);
+	}
+	else
+	{
+		commandline_print_usage(&echo_cmd, stderr);
+		exit(1);
+	}
+
+	return;
 }
