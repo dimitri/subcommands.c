@@ -15,9 +15,12 @@
 #define __FILEPATHS_H__
 
 #include <libgen.h>
+#include <fcntl.h>
 #include <fts.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
