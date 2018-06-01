@@ -530,14 +530,21 @@ filepath_merge(Path *specs, Path *defaults)
 	{
 		merge->name = specs->name == NULL ? defaults->name : specs->name;
 
-		if (specs->extension != NULL || defaults->extension != NULL)
+		if (specs->extension != NULL)
 		{
-			merge->extension =
-				specs->extension == NULL ? defaults->extension : specs->extension;
+			merge->extension = specs->extension;
+		}
+		else if (defaults->extension != NULL)
+		{
+			merge->extension = defaults->extension;
+		}
+		else
+		{
+			merge->extension = NULL;
 		}
 	}
 
-	/* filepath_rebuild is going to make copies of the memory */
+	/* filepath_new_from_pieces is going to make copies of the memory */
 	return filepath_new_from_pieces(merge);
 }
 
