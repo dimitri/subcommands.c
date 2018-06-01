@@ -52,6 +52,7 @@ void filepath_fprintf(FILE *stream, Path *path);
 Path *filepath_cwd();
 Path *filepath_join(Path *path, const char *filename);
 Path *filepath_merge(Path *specs, Path *defaults);
+Path *filepath_merge_filename(const char *filename, Path *defaults);
 Path *filepath_with_extension(Path *path, const char *extension);
 
 const char *filepath_absolute_filename(Path *path);
@@ -548,6 +549,21 @@ filepath_merge(Path *specs, Path *defaults)
 	return filepath_new_from_pieces(merge);
 }
 
+
+/*
+ * Merge filename into the defaults Path: we place the filename into the
+ * defaults directory, and reuse the filename's name and extension.
+ */
+Path *
+filepath_merge_filename(const char *filename, Path *defaults)
+{
+	Path *path = filepath_new(filename);
+	Path *merge = filepath_merge(path, defaults);
+
+	filepath_free(path);
+
+	return merge;
+}
 
 /*
  * Like a merge but for the extension only.
