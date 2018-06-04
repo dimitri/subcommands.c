@@ -11,8 +11,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#define COMMAND_LINE_IMPLEMENTATION
 #include "commandline.h"
+
+#define FILEPATHS_IMPLEMENTATION
 #include "filepaths.h"
+
+#define RUN_PROGRAM_IMPLEMENTATION
 #include "runprogram.h"
 
 static bool ls_opt_all = false;

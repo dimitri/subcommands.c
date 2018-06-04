@@ -11,8 +11,8 @@
  *
  */
 
-#ifndef __FILEPATHS_H__
-#define __FILEPATHS_H__
+#ifdef FILEPATHS_IMPLEMENTATION
+#undef FILEPATHS_IMPLEMENTATION
 
 #include <libgen.h>
 #include <fcntl.h>
@@ -923,4 +923,4 @@ filepath_list_find(PathList *path, const char *filename)
 }
 
 
-#endif  /* __FILEPATHS_H__ */
+#endif  /* FILEPATHS_IMPLEMENTATION */

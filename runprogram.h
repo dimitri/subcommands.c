@@ -4,8 +4,8 @@
  *
  */
 
-#ifndef __RUN_PROGRAM_H__
-#define __RUN_PROGRAM_H__
+#ifdef RUN_PROGRAM_IMPLEMENTATION
+#undef RUN_PROGRAM_IMPLEMENTATION
 
 #include <fcntl.h>
 #include <stdlib.h>
@@ -224,4 +224,4 @@ read_into_sds(int filedes, sds *buffer)
 }
 
 
-#endif  /* __RUN_PROGRAM_H__ */
+#endif  /* RUN_PROGRAM_IMPLEMENTATION */

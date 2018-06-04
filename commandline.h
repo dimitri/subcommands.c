@@ -4,8 +4,8 @@
  *
  */
 
-#ifndef __COMMAND_LINE_H__
-#define __COMMAND_LINE_H__
+#ifdef COMMAND_LINE_IMPLEMENTATION
+#undef COMMAND_LINE_IMPLEMENTATION
 
 #include <string.h>
 
@@ -213,4 +213,4 @@ commandline_add_breadcrumb(cmd_t *command, cmd_t *subcommand)
 	return;
 }
 
-#endif  /* __COMMAND_LINE_H__ */
+#endif  /* COMMAND_LINE_IMPLEMENTATION */
