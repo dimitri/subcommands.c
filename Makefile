@@ -26,8 +26,9 @@ test-commandline: foo
 	./foo ls --help
 
 test-filepaths: foo tree
-	./foo path
+	./foo path -h
 	./foo path ls foo.c
+	./foo path ls /tmp/citus-ha-keeper-tests/node_b.backup/
 	./foo path ext foo.c .py
 	./foo path ext foo.c py
 	./foo path join ../subcommands.c foo.c
@@ -35,6 +36,7 @@ test-filepaths: foo tree
 	./foo path rel ./foo.c ../../..
 	./foo path rmdir $(TESTDIR)
 	tree $(TESTDIR)
+	./foo path ls $(TESTDIR)
 	./foo path find pg_ctl
 
 test-runprogram: foo

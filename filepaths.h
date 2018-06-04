@@ -45,6 +45,7 @@ typedef struct
 } PathList;
 
 Path *filepath_new(const char *filename);
+Path *filepath_newdir(const char *filename);
 void filepath_refresh_stats(Path *path);
 void filepath_free(Path *path);
 
@@ -63,6 +64,8 @@ const char *filepath_relative_filename(Path *path, Path *maybe_root);
 
 bool filepath_is_absolute(Path *path);
 bool filepath_is_relative(Path *path);
+bool filename_ends_with_slash(const char *filename);
+bool filepath_is_dir(Path *path);
 bool filepath_file_exists(Path *path);
 bool filepath_directory_exists(Path *path);
 bool filepath_ensure_directories_exist(Path *path, mode_t mode);
@@ -108,8 +111,42 @@ filepath_new(const char *filename)
 	 */
 	filepath_normalize_directory(path);
 
+
 	return path;
 }
+
+
+/*
+ * Create a Path object from a filename that is meant to be a directory name.
+ *
+ * This API call is mainly useful when you want to create a directory (see the
+ * `filepath_ensure_directories_exist' function), and you want to make sure any
+ * file parsing smarts aren't going in the way. That typically happens e.g.
+ * when directory names might contain dots.
+ */
+Path *
+filepath_newdir(const char *filename)
+{
+	Path *result;
+	char *dirname;
+
+	if (filename_ends_with_slash(filename))
+	{
+		dirname = strdup(filename);
+	}
+	else
+	{
+		dirname = (char *) malloc(MAXPATHLEN * sizeof(char));
+
+		sprintf(dirname, "%s/", filename);
+	}
+
+	result = filepath_new(dirname);
+	free(dirname);
+
+	return result;
+}
+
 
 /*
  * Helper function to normalize given filename into a proper path, part of the
@@ -133,9 +170,7 @@ filepath_normalize_directory(Path *path)
 	}
 	else
 	{
-		int len = strlen(path->filename);
-
-		is_dir = len >= 2 && path->filename[len-2] == '/';
+		is_dir = filename_ends_with_slash(path->filename);
 	}
 
 	/*
@@ -147,9 +182,9 @@ filepath_normalize_directory(Path *path)
 	 * When the path itself is a directory, append the last part to our
 	 * directories list.
 	 */
-	if (is_dir)
+	if (path->realpath != NULL && is_dir)
 	{
-		int bytes = strlen(path->realpath) + 2;
+		int bytes = strlen(path->realpath) + 1;
 		realpath = (char *) malloc(bytes * sizeof(char));
 
 		sprintf(realpath, "%s/", path->realpath);
@@ -238,6 +273,15 @@ filepath_normalize_directory(Path *path)
 			path->directories[i++] = previous;
 			*ptr = '\0';
 		}
+	}
+
+	/*
+	 * If we have a path that ends with a slash, fill in the empty extra dir
+	 * with a NULL pointer, as the rest of code knows how to deal with that.
+	 */
+	if (path->nb_dirs > 0 && path->nb_dirs == i+1)
+	{
+		path->directories[i] = NULL;
 	}
 
 	/*
@@ -362,8 +406,15 @@ filepath_sprintf(char *dest, Path *path)
 		{
 			char *dir = path->directories[i];
 
-			len += strlen(dir) + 1;
-			sprintf(dest, "%s/%s", dest, dir);
+			if (dir != NULL)
+			{
+				len += strlen(dir) + 1;
+				sprintf(dest, "%s/%s", dest, dir);
+			}
+			else
+			{
+				sprintf(dest, "%s/", dest);
+			}
 		}
 
 		if (path->name != NULL)
@@ -407,8 +458,13 @@ filepath_fprintf(FILE *stream, Path *path)
 	{
 		for (int i = 0; i < path->nb_dirs; i++)
 		{
-			char *fmt = i == 0 ? "%s" : "%s/";
-			fprintf(stream, fmt, path->directories[i]);
+			/* when path doesn't exists and ends with a slash */
+			if (path->directories[i] != NULL)
+			{
+				char *fmt = i == 0 ? "%s" : "%s/";
+
+				fprintf(stream, fmt, path->directories[i]);
+			}
 		}
 
 		if (path->name != NULL)
@@ -711,6 +767,27 @@ bool filepath_is_relative(Path *path)
 
 
 /*
+ * Returns true on either of those conditions:
+ *
+ *  - path exists and is a directory
+ *  - path does not exists and its filenames ends with a /
+ */
+bool
+filename_ends_with_slash(const char *filename)
+{
+	int len = filename == NULL ? 0 : strlen(filename);
+
+	return len > 2 && filename[len-1] == '/';
+}
+
+bool
+filepath_is_dir(Path *path)
+{
+	return filepath_directory_exists(path)
+		|| filename_ends_with_slash(path->filename);
+}
+
+/*
  * We cache the fact that a file exists when building our cache.
  */
 bool
@@ -736,51 +813,85 @@ filepath_directory_exists(Path *path)
 bool
 filepath_ensure_directories_exist(Path *path, mode_t mode)
 {
-	if (path->exists)
+	/*
+	 * The path that's been created might have been normalized as a file,
+	 * because maybe a / was not appended to the end of the filename. Make
+	 * sure we normalize the filename as a directory here, as a convenience
+	 * for our users.
+	 */
+	char *currdir = (char *) malloc(MAXPATHLEN * sizeof(char));
+
+	if (!filename_ends_with_slash(path->filename))
 	{
-		return path->st != NULL && S_ISDIR(path->st->st_mode);
+		char *dirname = (char *) malloc(MAXPATHLEN * sizeof(char));
+
+		sprintf(dirname, "%s/", path->filename);
+		path->realpath = dirname;
+		filepath_normalize_directory(path);
 	}
-	else
+
+	/* ok, now back to our business of creating directories */
+	sprintf(currdir, "");
+
+	for (int i = 1; i < path->nb_dirs; i++)
 	{
-		/*
-		 * Ok so the path doesn't exists yet.
-		 *
-		 * The path that's been created might have been normalized as a file,
-		 * because maybe a / was not appended to the end of the filename. Make
-		 * sure we normalize the filename as a directory here, as a convenience
-		 * for our users.
-		 */
-		int len = strlen(path->filename);
-		bool is_dir = len >= 2 && path->filename[len-2] == '/';
-		char *currdir = (char *) malloc(MAXPATHLEN * sizeof(char));
-
-		if (!is_dir)
+		/* the last entry might be NULL, and that's ok */
+		if (path->directories[i] == NULL)
 		{
-			char *dirname = (char *) malloc(MAXPATHLEN * sizeof(char));
-
-			sprintf(dirname, "%s/", path->filename);
-			path->realpath = dirname;
-			filepath_normalize_directory(path);
+			if (i+1 == path->nb_dirs)
+			{
+				continue;
+			}
+			else
+			{
+				return false;
+			}
 		}
 
-		/* ok, now back to our business of creating directories */
-		sprintf(currdir, "");
+		sprintf(currdir, "%s/%s", currdir, path->directories[i]);
 
-		for (int i = 1; i < path->nb_dirs; i++)
+		if (mkdir(currdir, mode) == -1)
 		{
-			bool exists;
+			int mkdir_errno = errno;
 
-			sprintf(currdir, "%s/%s", currdir, path->directories[i]);
-
-			if (access(currdir, F_OK) != 0)
+			if (errno == EEXIST)
 			{
-				if (mkdir(currdir, mode) == -1)
+				/*
+				 * The file already exists, that's only an error when
+				 * the file isn't actually a directory.
+				 */
+				struct stat st;
+
+				if (stat(currdir, &st) == -1)
 				{
+					/* stat failed, stop here, reset errno */
+					errno = mkdir_errno;
 					return false;
 				}
+				else
+				{
+					/* stat ok, let's see if it's a directory */
+					if (!S_ISDIR(st.st_mode))
+					{
+						/* not a directory, something went wrong */
+						return false;
+					}
+				}
+
+				/*
+				 * Here, we got file already exists when doing mkdir(),
+				 * as errno is EEXIST. Now, when having a detailed look
+				 * with stat(), we realize the file is actually a
+				 * directory, which is what we want, so just move on.
+				 */
+			}
+			else
+			{
+				return false;
 			}
 		}
 	}
+	filepath_refresh_stats(path);
 	return true;
 }
 
@@ -791,44 +902,53 @@ filepath_ensure_directories_exist(Path *path, mode_t mode)
 bool
 filepath_remove_directory(Path *path)
 {
-	/* of course that only works on files that do exist. */
-	if (path->realpath != NULL && path->exists)
-	{
-		char *topdirs[] = {path->realpath, NULL};
-		FTSENT *entry;
-		FTS *tree =
-			fts_open(topdirs, FTS_PHYSICAL|FTS_NOCHDIR|FTS_NOSTAT, NULL);
+	char *topdirs[] = {path->realpath, NULL};
+	FTSENT *entry;
+	FTS *tree =
+		fts_open(topdirs, FTS_PHYSICAL|FTS_NOCHDIR|FTS_NOSTAT, NULL);
 
-		while ((entry = fts_read(tree)) != NULL)
+	while ((entry = fts_read(tree)) != NULL)
+	{
+		switch (entry->fts_info)
 		{
-			switch (entry->fts_info)
+			/*
+			 * We use FTS_DP to remove a directory only once its contents
+			 * have been taken care of, and we're careful to ignore FTS_D
+			 * here.
+			 */
+			case FTS_DP:
+			case FTS_F:
+			case FTS_NS:
+			case FTS_NSOK:
+			case FTS_SL:
+			case FTS_SLNONE:
 			{
-				/*
-				 * We use FTS_DP to remove a directory only once its contents
-				 * have been taken care of, and we're careful to ignore FTS_D
-				 * here.
-				 */
-				case FTS_DP:
-				case FTS_F:
-				case FTS_NS:
-				case FTS_NSOK:
-				case FTS_SL:
-				case FTS_SLNONE:
-					if (remove(entry->fts_accpath) == -1)
+				if (remove(entry->fts_accpath) == -1)
+				{
+					if (errno == ENOENT)
+					{
+						/*
+						 * We're trying a remove a file that does not exists,
+						 * let's not consider that is an error.
+						 */
+						continue;
+					}
+					else
 					{
 						return false;
 					}
-					break;
-
-				case FTS_D:
-				default:
-					/* ignore other cases */
-					break;
+				}
+				break;
 			}
+
+			case FTS_D:
+			default:
+				/* ignore other cases */
+				break;
 		}
-		return true;
 	}
-	return false;
+
+	return true;
 }
 
 /*

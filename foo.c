@@ -271,6 +271,8 @@ main_path_ls(int argc, char **argv)
 		printf("realpath: %s\n", path->realpath);
 		printf("    name: %s\n", path->name);
 		printf("    .ext: %s\n", path->extension);
+		printf("    stat: %s\n", path->exists ? "exists" : "does not exists");
+		printf("  is dir: %s\n", filepath_is_dir(path) ? "yes" : "no");
 		printf("\n");
 		filepath_fprintf(stdout, path);
 		printf("\n\n");
@@ -412,10 +414,8 @@ main_path_mkdirs(int argc, char **argv)
 {
 	if (argc == 1)
 	{
-		Path *target = filepath_new(argv[0]);
+		Path *target = filepath_newdir(argv[0]);
 		bool created = filepath_ensure_directories_exist(target, 0755);
-
-		filepath_free(target);
 
 		if (!created)
 		{
@@ -425,6 +425,19 @@ main_path_mkdirs(int argc, char **argv)
 					strerror(errno));
 			exit(1);
 		}
+
+		printf("get name: %s\n", filepath_get_filename(target));
+		printf("filename: %s\n", target->filename);
+		printf("realpath: %s\n", target->realpath);
+		printf("    name: %s\n", target->name);
+		printf("    .ext: %s\n", target->extension);
+		printf("    stat: %s\n", target->exists ? "exists" : "does not exists");
+		printf("  is dir: %s\n", filepath_is_dir(target) ? "yes" : "no");
+		printf("\n");
+		filepath_fprintf(stdout, target);
+		printf("\n\n");
+
+		filepath_free(target);
 	}
 	else
 	{
@@ -443,8 +456,6 @@ main_path_rmdir(int argc, char **argv)
 		Path *target = filepath_new(argv[0]);
 		bool deleted = filepath_remove_directory(target);
 
-		filepath_free(target);
-
 		if (!deleted)
 		{
 			fprintf(stderr,
@@ -453,6 +464,10 @@ main_path_rmdir(int argc, char **argv)
 					strerror(errno));
 			exit(1);
 		}
+
+		printf("deleted directory \"%s\"\n\n", target->realpath);
+		fflush(stdout);
+		filepath_free(target);
 	}
 	else
 	{
