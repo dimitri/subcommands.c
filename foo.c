@@ -598,6 +598,7 @@ main_which(int argc, char **argv)
 	if (argc == 1)
 	{
 		Program prog = run_program("/usr/bin/which", argv[0], NULL);
+		int rc = prog.rc;
 
 		if (prog.error != 0)
 		{
@@ -613,7 +614,9 @@ main_which(int argc, char **argv)
 		fflush(stdout);
 		fflush(stderr);
 
-		exit(prog.rc);
+		free_program(&prog);
+
+		exit(rc);
 	}
 	else
 	{

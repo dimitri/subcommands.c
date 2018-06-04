@@ -39,6 +39,7 @@ struct arglist
 
 Program run_program(const char *program, ...);
 Program run_program_internal(Program prog);
+void free_program(Program *prog);
 
 static ssize_t read_into_sds(int filedes, sds *buffer);
 
@@ -203,6 +204,27 @@ run_program_internal(Program prog)
 	return prog;
 }
 
+
+/*
+ * Free our memory.
+ */
+void
+free_program(Program *prog)
+{
+	/* don't free prog->program, it's the same pointer as prog->args[0] */
+	for (int i = 0; prog->args[i] != NULL; i++)
+	{
+		free(prog->args[i]);
+	}
+	free(prog->args);
+
+	sdsfree(prog->out);
+	sdsfree(prog->err);
+
+	/* free(prog); */
+
+	return;
+}
 
 /*
  * Read from a file descriptor and directly appends to our buffer string.
