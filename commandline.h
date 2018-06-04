@@ -101,7 +101,7 @@ commandline_run(cmd_t *command, int argc, char **argv)
             }
 
 			/* if we reach this code, we didn't find a subcommand */
-			fprintf(stderr, "%s: command not found\n", argv[0]);
+			fprintf(stderr, "%s: command not found\n", argv0);
 			fflush(stderr);
 
 			fprintf(stderr, "\n");
@@ -156,7 +156,12 @@ commandline_print_usage(cmd_t *command, FILE *stream)
 void
 commandline_print_subcommands(cmd_t *command, FILE *stream)
 {
-	fprintf(stream, "Available commands:\n");
+	/* the root command doesn't have a breadcrumb at this point */
+	const char *breadcrumb =
+		command->breadcrumb == NULL ? command->name : command->breadcrumb;
+
+	fprintf(stream, "Available commands:\n  %s\n", breadcrumb);
+
 	if (command->subcommands != NULL)
 	{
 		cmd_t **subc;
