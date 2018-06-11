@@ -94,7 +94,7 @@ filepath_new(const char *filename)
 	char *ptr;
 	bool is_dir;
 
-	path->filename = (char *)filename;
+	path->filename = strdup(filename);
 	path->realpath = realpath(filename, resolved);
 
 	/* we fix that as part of the normalization process, see below */
@@ -184,7 +184,7 @@ filepath_normalize_directory(Path *path)
 	 */
 	if (path->realpath != NULL && is_dir)
 	{
-		int bytes = strlen(path->realpath) + 1;
+		int bytes = strlen(path->realpath) + 2;
 		realpath = (char *) malloc(bytes * sizeof(char));
 
 		sprintf(realpath, "%s/", path->realpath);
@@ -363,6 +363,11 @@ filepath_free(Path *path)
 	if (path == NULL)
 	{
 		return;
+	}
+
+	if (path->filename != NULL)
+	{
+		free(path->filename);
 	}
 
 	if (path->st != NULL)
