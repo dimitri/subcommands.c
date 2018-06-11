@@ -101,7 +101,7 @@ commandline_run(cmd_t *command, int argc, char **argv)
             }
 
 			/* if we reach this code, we didn't find a subcommand */
-			fprintf(stderr, "%s: command not found\n", argv0);
+			fprintf(stderr, "%s: incomplete command\n", argv0);
 			fflush(stderr);
 
 			fprintf(stderr, "\n");
