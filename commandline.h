@@ -208,11 +208,9 @@ commandline_add_breadcrumb(cmd_t *command, cmd_t *subcommand)
 		command->breadcrumb ? command->breadcrumb : command->name;
 	int command_bc_len = strlen(command_bc);
 	int subcommand_len = strlen(subcommand->name);
+	int bc_len = command_bc_len + subcommand_len + 2;
 
-	subcommand->breadcrumb =
-		/* the null terminator is counted twice, but we add a space */
-		(char *) malloc((command_bc_len + subcommand_len) * sizeof(char));
-
+	subcommand->breadcrumb = (char *) malloc(bc_len * sizeof(char));
 	sprintf(subcommand->breadcrumb, "%s %s", command_bc, subcommand->name);
 
 	return;

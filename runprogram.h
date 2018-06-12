@@ -8,13 +8,14 @@
 #undef RUN_PROGRAM_IMPLEMENTATION
 
 #include <fcntl.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
 
-#include "sds.h"
+#include "pqexpbuffer.h"
 
 #define BUFSIZE			1024
 #define ARGS_INCREMENT	12
@@ -27,8 +28,8 @@ typedef struct
 	int error;
 	int rc;
 
-	sds out;
-	sds err;
+	char *out;
+	char *err;
 } Program;
 
 struct arglist
@@ -41,7 +42,7 @@ Program run_program(const char *program, ...);
 Program run_program_internal(Program prog);
 void free_program(Program *prog);
 
-static ssize_t read_into_sds(int filedes, sds *buffer);
+static size_t read_into_buf(int filedes, PQExpBuffer buffer);
 
 
 /*
@@ -100,9 +101,6 @@ run_program_internal(Program prog)
 	pid_t pid;
     int outpipe[2] = {0,0};
     int errpipe[2] = {0,0};
-
-	prog.out = sdsempty();
-	prog.err = sdsempty();
 
 	/* Flush stdio channels just before fork, to avoid double-output problems */
 	fflush(stdout);
@@ -182,21 +180,32 @@ run_program_internal(Program prog)
 			/*
 			 * Ok. the child process is done, let's read the pipes content.
 			 */
+			PQExpBuffer outbuf, errbuf;
+
+			outbuf = createPQExpBuffer();
+			errbuf = createPQExpBuffer();
+
 			while (bytes_out == BUFSIZE || bytes_err == BUFSIZE)
 			{
 				/* only continue until we're done, right? */
 				if (bytes_out == BUFSIZE)
 				{
-					bytes_out = read_into_sds(outpipe[0], &prog.out);
+					bytes_out = read_into_buf(outpipe[0], outbuf);
 				}
 
 				if (bytes_err == BUFSIZE)
 				{
-					bytes_err = read_into_sds(errpipe[0], &prog.err);
+					bytes_err = read_into_buf(errpipe[0], errbuf);
 				}
 			}
 			close(outpipe[0]);
 			close(errpipe[0]);
+
+			prog.out = strdup(outbuf->data);
+			prog.err = strdup(errbuf->data);
+
+			destroyPQExpBuffer(outbuf);
+			destroyPQExpBuffer(errbuf);
 
 			return prog;
 		}
@@ -218,10 +227,8 @@ free_program(Program *prog)
 	}
 	free(prog->args);
 
-	sdsfree(prog->out);
-	sdsfree(prog->err);
-
-	/* free(prog); */
+	free(prog->out);
+	free(prog->err);
 
 	return;
 }
@@ -229,18 +236,15 @@ free_program(Program *prog)
 /*
  * Read from a file descriptor and directly appends to our buffer string.
  */
-static ssize_t
-read_into_sds(int filedes, sds *buffer)
+static size_t
+read_into_buf(int filedes, PQExpBuffer buffer)
 {
-	size_t len = sdslen(*buffer);
-	ssize_t bytes;
-
-	*buffer = sdsMakeRoomFor(*buffer, BUFSIZE);
-	bytes = read(filedes, *buffer + len, BUFSIZE);
+	char *temp_buffer = (char *) malloc(BUFSIZE * sizeof(char));
+	size_t bytes = read(filedes, temp_buffer, BUFSIZE);
 
 	if (bytes > 0)
 	{
-		sdsIncrLen(*buffer, bytes);
+		appendPQExpBufferStr(buffer, temp_buffer);
 	}
 	return bytes;
 }

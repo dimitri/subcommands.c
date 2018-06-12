@@ -622,7 +622,7 @@ main_which(int argc, char **argv)
 			fflush(stderr);
 			exit(1);
 		}
-		fprintf(stdout, "%p %ld\n", prog.out, sdslen(prog.out));
+		fprintf(stdout, "%p %ld\n", prog.out, strlen(prog.out));
 		fprintf(stdout, "%s", prog.out);
 		fprintf(stderr, "%s", prog.err);
 

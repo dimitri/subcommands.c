@@ -1,9 +1,13 @@
 TESTDIR = /tmp/sub
+PG_CONFIG ?= pg_config
+
+CFLAGS  = -std=c99 -D_GNU_SOURCE -O0 -g
+CFLAGS += -I $(shell $(PG_CONFIG) --includedir)
 
 all: foo ;
 
 foo: $(wildcard *.h) foo.c
-	gcc -O0 -g foo.c -o $@
+	gcc $(CFLAGS) pqexpbuffer.c foo.c -o $@
 
 clean:
 	rm -f foo

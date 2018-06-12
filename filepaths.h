@@ -24,7 +24,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "pqexpbuffer.h"
+
 #define MAXPATHLEN 1024			/* TODO: find proper header */
+
+#define streq(a, b)  (a != NULL && b != NULL && strcmp(a, b) == 0)
 
 typedef struct
 {
@@ -95,7 +99,13 @@ filepath_new(const char *filename)
 	bool is_dir;
 
 	path->filename = strdup(filename);
-	path->realpath = realpath(filename, resolved);
+	path->realpath = NULL;
+
+	/* only compute realpath when the file exists. */
+	if (access(path->filename, F_OK) == 0)
+	{
+		path->realpath = realpath(path->filename, resolved);
+	}
 
 	/* we fix that as part of the normalization process, see below */
 	path->name = NULL;
@@ -159,6 +169,12 @@ filepath_normalize_directory(Path *path)
 	bool is_dir;
 	int i;
 
+	/* default initialization, we might override that later */
+	path->nb_dirs = 0;
+	path->directories = NULL;
+	path->name = NULL;
+	path->extension = NULL;
+
 	if (path->filename == NULL)
 	{
 		return;
@@ -167,29 +183,30 @@ filepath_normalize_directory(Path *path)
 	if (path->realpath != NULL && path->st != NULL)
 	{
 		is_dir = S_ISDIR(path->st->st_mode);
+
+		/*
+		 * When the path itself is a directory, append the last part to our
+		 * directories list.
+		 */
+		if (is_dir)
+		{
+			int bytes = strlen(path->realpath) + 2;
+			realpath = (char *) malloc(bytes * sizeof(char));
+
+			sprintf(realpath, "%s/", path->realpath);
+		}
+		else
+		{
+			realpath = strdup(path->realpath);
+		}
 	}
 	else
 	{
 		is_dir = filename_ends_with_slash(path->filename);
 	}
 
-	/*
-	 * Now, normalize the directory path.
-	 */
-	path->nb_dirs = 0;
 
-	/*
-	 * When the path itself is a directory, append the last part to our
-	 * directories list.
-	 */
-	if (path->realpath != NULL && is_dir)
-	{
-		int bytes = strlen(path->realpath) + 2;
-		realpath = (char *) malloc(bytes * sizeof(char));
-
-		sprintf(realpath, "%s/", path->realpath);
-	}
-	else if (path->realpath != NULL)
+	if (path->realpath != NULL)
 	{
 		realpath = strdup(path->realpath);
 	}
@@ -203,11 +220,11 @@ filepath_normalize_directory(Path *path)
 		 * going forward(-slash).
 		 */
 		int f_i, r_i;
-		int len = strlen(path->filename);
+		int len = strlen(path->filename) + 1;
 		char previous = '\0';
 
-		realpath = (char *) malloc((len+1) * sizeof(char));
-		realpath[len] = '\0';
+		realpath = (char *) malloc(len * sizeof(char));
+		realpath[len-1] = '\0';
 
 		for (f_i = 0, r_i = 0; f_i < len; previous = path->filename[f_i++])
 		{
@@ -227,8 +244,8 @@ filepath_normalize_directory(Path *path)
 		path->realpath = strdup(realpath);
 	}
 
-	/* we compute nb_dirs on the non-modified realpath */
-	if (path->realpath != NULL)
+	/* now, compute directories */
+	if (realpath != NULL)
 	{
 		for (ptr = path->realpath; *ptr != '\0'; ptr++)
 		{
@@ -237,7 +254,7 @@ filepath_normalize_directory(Path *path)
 				path->nb_dirs++;
 			}
 		}
-		path->nb_dirs += is_dir ? 1 :0;
+		path->nb_dirs += is_dir ? 1 : 0;
 
 		if (path->nb_dirs == 0)
 		{
@@ -248,6 +265,11 @@ filepath_normalize_directory(Path *path)
 			path->directories =
 				(char **) malloc(path->nb_dirs * sizeof(char *));
 		}
+	}
+	else
+	{
+		path->nb_dirs = 0;
+		path->directories = NULL;
 	}
 
 	/*
@@ -386,7 +408,7 @@ filepath_free(Path *path)
 	 */
 	if (path->directories != NULL)
 	{
-		free(*(path->directories));
+		free(path->directories);
 	}
 
 	free(path);
@@ -400,13 +422,13 @@ filepath_free(Path *path)
 int
 filepath_sprintf(char *dest, Path *path)
 {
-	int len = 0;
+	int len;
+	PQExpBuffer fn;
+
+	fn = createPQExpBuffer();
 
 	if (path->realpath != NULL)
 	{
-		len += 1;
-		sprintf(dest, "");
-
 		for (int i = 1; i < path->nb_dirs; i++)
 		{
 			char *dir = path->directories[i];
@@ -414,31 +436,34 @@ filepath_sprintf(char *dest, Path *path)
 			if (dir != NULL)
 			{
 				len += strlen(dir) + 1;
-				sprintf(dest, "%s/%s", dest, dir);
+				appendPQExpBuffer(fn, "/%s", dir);
 			}
 			else
 			{
-				sprintf(dest, "%s/", dest);
+				appendPQExpBuffer(fn, "/");
 			}
 		}
 
 		if (path->name != NULL)
 		{
-			len += strlen(path->name) + 1;
-			sprintf(dest, "%s/%s", dest, path->name);
+			appendPQExpBuffer(fn, "/%s", path->name);
 
 			if (path->extension != NULL)
 			{
-				len += strlen(path->extension) + 1;
-				sprintf(dest, "%s.%s", dest, path->extension);
+				appendPQExpBuffer(fn, ".%s", path->extension);
 			}
 		}
 	}
 	else if (path->filename != NULL)
 	{
-		len = strlen(path->filename);
-		sprintf(dest, "%s", path->filename);
+		appendPQExpBuffer(fn, "%s", path->filename);
 	}
+
+	len = fn->len;
+	dest = strdup(fn->data);
+
+	destroyPQExpBuffer(fn);
+
 	return len;
 }
 
@@ -500,6 +525,7 @@ filepath_refresh_stats(Path *path)
 
 	if (path->realpath == NULL)
 	{
+		path->exists = false;
 		path->st = NULL;
 		return;
 	}
@@ -528,10 +554,18 @@ Path *filepath_cwd()
 {
 	Path *path;
 	char *cwd = (char *) malloc(MAXPATHLEN * sizeof(char));
+	char *ptr;
 
-	cwd = getcwd(cwd, MAXPATHLEN);
+	ptr = getcwd(cwd, MAXPATHLEN);
+
+	if (cwd == NULL)
+	{
+		free(cwd);
+		return NULL;
+	}
 
 	path = filepath_new(cwd);
+	free(cwd);
 
 	return path;
 }
@@ -577,8 +611,6 @@ Path *
 filepath_merge(Path *specs, Path *defaults)
 {
 	Path *merge;
-	int nb_dirs;
-	char **dirs;
 
 	if (specs->nb_dirs > 0)
 	{
@@ -676,7 +708,7 @@ filepath_relative_filename(Path *path, Path *maybe_root)
 	 */
 	for (int i = 0; i < maybe_root->nb_dirs; i++)
 	{
-		if (strcmp(maybe_root->directories[i], path->directories[i]) == 0)
+		if (streq(maybe_root->directories[i], path->directories[i]))
 		{
 			common_subdirs_count++;
 		}
