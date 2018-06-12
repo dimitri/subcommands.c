@@ -24,7 +24,6 @@ static bool ls_opt_all = false;
 static bool ls_opt_long = false;
 static bool ls_opt_recursive = false;
 
-static void main_env(int argc, char **argv);
 static void main_env_get(int argc, char **argv);
 static void main_env_set(int argc, char **argv);
 
@@ -39,9 +38,6 @@ static void main_path_find(int argc, char **argv);
 
 static void main_ls(int argc, char **argv);
 static int ls_getopt(int argc, char **argv);
-
-static void main_cat(int argc, char **argv);
-static int cat_getopt(int argc, char **argv);
 
 static void main_which(int argc, char **argv);
 static void main_echo12(int argc, char **argv);
@@ -181,18 +177,8 @@ main(int argc, char **argv)
  * this command does. That's the limit of this example program.
  */
 static void
-main_env(int argc, char **argv)
-{
-  fprintf(stdout, "entering %s\n", __func__);
-  return;
-}
-
-
-static void
 main_env_get(int argc, char **argv)
 {
-	char *val;
-
 	if (argc == 1)
     {
 		char *val = getenv(argv[0]);
@@ -588,22 +574,6 @@ main_ls(int argc, char **argv)
 	fprintf(stdout, "\n");
 	fflush(stdout);
 	return;
-}
-
-
-static void
-main_cat(int argc, char **argv)
-{
-  fprintf(stdout, "entering %s", __func__);
-  return;
-}
-
-
-static int
-cat_getopt(int argc, char **argv)
-{
-  fprintf(stdout, "entering %s", __func__);
-  return 1;
 }
 
 

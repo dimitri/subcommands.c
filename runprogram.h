@@ -61,6 +61,8 @@ run_program(const char *program, ...)
 	prog.program = strdup(program);
 	prog.rc = -1;
 	prog.error = 0;
+	prog.out = NULL;
+	prog.err = NULL;
 
 	prog.args = (char **) malloc(ARGS_INCREMENT * sizeof(char *));
 	prog.args[nb_args++] = prog.program;
@@ -157,6 +159,7 @@ run_program_internal(Program prog)
 			/* fork succeeded, in parent */
 			int status;
 			ssize_t bytes_out = BUFSIZE, bytes_err = BUFSIZE;
+			PQExpBuffer outbuf, errbuf;
 
 			/* We read from the other side of the pipe, close that part.  */
 			close(outpipe[1]);
@@ -180,8 +183,6 @@ run_program_internal(Program prog)
 			/*
 			 * Ok. the child process is done, let's read the pipes content.
 			 */
-			PQExpBuffer outbuf, errbuf;
-
 			outbuf = createPQExpBuffer();
 			errbuf = createPQExpBuffer();
 
@@ -201,8 +202,15 @@ run_program_internal(Program prog)
 			close(outpipe[0]);
 			close(errpipe[0]);
 
-			prog.out = strdup(outbuf->data);
-			prog.err = strdup(errbuf->data);
+			if (outbuf->len > 0)
+			{
+				prog.out = strdup(outbuf->data);
+			}
+
+			if (errbuf->len > 0)
+			{
+				prog.err = strdup(errbuf->data);
+			}
 
 			destroyPQExpBuffer(outbuf);
 			destroyPQExpBuffer(errbuf);
@@ -227,8 +235,15 @@ free_program(Program *prog)
 	}
 	free(prog->args);
 
-	free(prog->out);
-	free(prog->err);
+	if (prog->out != NULL)
+	{
+		free(prog->out);
+	}
+
+	if (prog->err != NULL)
+	{
+		free(prog->err);
+	}
 
 	return;
 }

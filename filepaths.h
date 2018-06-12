@@ -17,6 +17,7 @@
 #include <libgen.h>
 #include <fcntl.h>
 #include <fts.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,8 +26,6 @@
 #include <unistd.h>
 
 #include "pqexpbuffer.h"
-
-#define MAXPATHLEN 1024			/* TODO: find proper header */
 
 #define streq(a, b)  (a != NULL && b != NULL && strcmp(a, b) == 0)
 
@@ -52,17 +51,19 @@ Path *filepath_new(const char *filename);
 Path *filepath_newdir(const char *filename);
 void filepath_refresh_stats(Path *path);
 void filepath_free(Path *path);
+Path *filepath_new_from_pieces(Path *path);
 
 char *filepath_get_filename(Path *path);
 int filepath_sprintf(char *dest, Path *path);
 void filepath_fprintf(FILE *stream, Path *path);
 
-Path *filepath_cwd();
+Path *filepath_cwd(void);
 Path *filepath_join(Path *path, const char *filename);
 Path *filepath_merge(Path *specs, Path *defaults);
 Path *filepath_merge_filename(const char *filename, Path *defaults);
 Path *filepath_with_extension(Path *path, const char *extension);
 
+bool filename_is_absolute(const char *filename);
 const char *filepath_absolute_filename(Path *path);
 const char *filepath_relative_filename(Path *path, Path *maybe_root);
 
@@ -94,9 +95,7 @@ Path *
 filepath_new(const char *filename)
 {
 	Path *path = (Path *) malloc(sizeof(Path));
-	char *resolved = (char *) malloc(MAXPATHLEN * sizeof(char));
-	char *ptr;
-	bool is_dir;
+	char *resolved = (char *) malloc(PATH_MAX * sizeof(char));
 
 	path->filename = strdup(filename);
 	path->realpath = NULL;
@@ -146,7 +145,7 @@ filepath_newdir(const char *filename)
 	}
 	else
 	{
-		dirname = (char *) malloc(MAXPATHLEN * sizeof(char));
+		dirname = (char *) malloc(PATH_MAX * sizeof(char));
 
 		sprintf(dirname, "%s/", filename);
 	}
@@ -208,7 +207,15 @@ filepath_normalize_directory(Path *path)
 
 	if (path->realpath != NULL)
 	{
-		realpath = strdup(path->realpath);
+		/*
+		 * We might have done some work already (when realpath is a directory
+		 * and exists), so refrain from losing what we did. Other cases still
+		 * need some work: realpath exists, is not a directory.
+		 */
+		if (realpath == NULL)
+		{
+			realpath = strdup(path->realpath);
+		}
 	}
 	else
 	{
@@ -298,8 +305,9 @@ filepath_normalize_directory(Path *path)
 	}
 
 	/*
-	 * If we have a path that ends with a slash, fill in the empty extra dir
-	 * with a NULL pointer, as the rest of code knows how to deal with that.
+	 * If we have a path that doesn't exists and ends with a slash, fill in the
+	 * empty extra dir with a NULL pointer, as the rest of code knows how to
+	 * deal with that.
 	 */
 	if (path->nb_dirs > 0 && path->nb_dirs == i+1)
 	{
@@ -350,13 +358,27 @@ filepath_normalize_directory(Path *path)
 Path *
 filepath_new_from_pieces(Path *path)
 {
-	char *filename = (char *) malloc(MAXPATHLEN * sizeof(char));
-	sprintf(filename, "");
+	Path *result;
+	PQExpBuffer fn;
+
+	fn = createPQExpBuffer();
 
 	/* starting at second directory and accumulating /dirname */
-	for (int i = 1; i < path->nb_dirs; i++)
+	for (int i = 0; i < path->nb_dirs; i++)
 	{
-		sprintf(filename, "%s/%s", filename, path->directories[i]);
+		char *dir = path->directories[i];
+
+		if (dir != NULL)
+		{
+			if (i == 0 && streq("/", dir))
+			{
+				appendPQExpBufferStr(fn, "/");
+			}
+			else
+			{
+				appendPQExpBuffer(fn, "%s/", dir);
+			}
+		}
 	}
 
 	/*
@@ -365,16 +387,20 @@ filepath_new_from_pieces(Path *path)
 	 */
 	if (path->name != NULL)
 	{
-		sprintf(filename, "%s/%s", filename, path->name);
+		appendPQExpBuffer(fn, "%s", path->name);
 
 		if (path->extension != NULL)
 		{
-			sprintf(filename, "%s.%s", filename, path->extension);
+			appendPQExpBuffer(fn, ".%s", path->extension);
 		}
 	}
 
-	return filepath_new(filename);
+	result = filepath_new(fn->data);
+	destroyPQExpBuffer(fn);
+
+	return result;
 }
+
 
 /*
  * Free allocated memory for a Path representation.
@@ -422,7 +448,7 @@ filepath_free(Path *path)
 int
 filepath_sprintf(char *dest, Path *path)
 {
-	int len;
+	int len = 0;
 	PQExpBuffer fn;
 
 	fn = createPQExpBuffer();
@@ -435,7 +461,6 @@ filepath_sprintf(char *dest, Path *path)
 
 			if (dir != NULL)
 			{
-				len += strlen(dir) + 1;
 				appendPQExpBuffer(fn, "/%s", dir);
 			}
 			else
@@ -460,7 +485,7 @@ filepath_sprintf(char *dest, Path *path)
 	}
 
 	len = fn->len;
-	dest = strdup(fn->data);
+	sprintf(dest, "%s", fn->data);
 
 	destroyPQExpBuffer(fn);
 
@@ -471,12 +496,13 @@ filepath_sprintf(char *dest, Path *path)
 char *
 filepath_get_filename(Path *path)
 {
-	char *filename = (char *) malloc(MAXPATHLEN * sizeof(char));
+	char *filename = (char *) malloc(PATH_MAX * sizeof(char));
 
 	filepath_sprintf(filename, path);
 
 	return filename;
 }
+
 
 /*
  * Print a filepath to stream.
@@ -550,15 +576,16 @@ filepath_refresh_stats(Path *path)
 /*
  * Return Current Working Directory (as in getcwd()) as a Path.
  */
-Path *filepath_cwd()
+Path *
+filepath_cwd()
 {
 	Path *path;
-	char *cwd = (char *) malloc(MAXPATHLEN * sizeof(char));
+	char *cwd = (char *) malloc(PATH_MAX * sizeof(char));
 	char *ptr;
 
-	ptr = getcwd(cwd, MAXPATHLEN);
+	ptr = getcwd(cwd, PATH_MAX);
 
-	if (cwd == NULL)
+	if (ptr == NULL)
 	{
 		free(cwd);
 		return NULL;
@@ -611,38 +638,44 @@ Path *
 filepath_merge(Path *specs, Path *defaults)
 {
 	Path *merge;
+	Path *pieces = (Path *) malloc(sizeof(Path));
 
 	if (specs->nb_dirs > 0)
 	{
-		merge->nb_dirs = specs->nb_dirs;
-		merge->directories = specs->directories;
+		pieces->nb_dirs = specs->nb_dirs;
+		pieces->directories = specs->directories;
 	}
 	else
 	{
-		merge->nb_dirs = defaults->nb_dirs;
-		merge->directories = defaults->directories;
+		pieces->nb_dirs = defaults->nb_dirs;
+		pieces->directories = defaults->directories;
 	}
 
 	if (specs->name != NULL || defaults->name != NULL)
 	{
-		merge->name = specs->name == NULL ? defaults->name : specs->name;
+		pieces->name = specs->name == NULL ? defaults->name : specs->name;
 
 		if (specs->extension != NULL)
 		{
-			merge->extension = specs->extension;
+			pieces->extension = specs->extension;
 		}
 		else if (defaults->extension != NULL)
 		{
-			merge->extension = defaults->extension;
+			pieces->extension = defaults->extension;
 		}
 		else
 		{
-			merge->extension = NULL;
+			pieces->extension = NULL;
 		}
 	}
 
 	/* filepath_new_from_pieces is going to make copies of the memory */
-	return filepath_new_from_pieces(merge);
+	merge = filepath_new_from_pieces(pieces);
+
+	/* we don't free the memory pointed to by pieces, only the Path itself */
+	free(pieces);
+
+	return merge;
 }
 
 
@@ -722,7 +755,7 @@ filepath_relative_filename(Path *path, Path *maybe_root)
 	/*
 	 * Time to allocate our answer.
 	 */
-	relpath = (char *) malloc(MAXPATHLEN * sizeof(char));
+	relpath = (char *) malloc(PATH_MAX * sizeof(char));
 
 	/*
 	 * If path is contained within maybe_root, that's easy, produce:
@@ -856,11 +889,13 @@ filepath_ensure_directories_exist(Path *path, mode_t mode)
 	 * sure we normalize the filename as a directory here, as a convenience
 	 * for our users.
 	 */
-	char *currdir = (char *) malloc(MAXPATHLEN * sizeof(char));
+	PQExpBuffer fn;
+
+	fn = createPQExpBuffer();
 
 	if (!filename_ends_with_slash(path->filename))
 	{
-		char *dirname = (char *) malloc(MAXPATHLEN * sizeof(char));
+		char *dirname = (char *) malloc(PATH_MAX * sizeof(char));
 
 		sprintf(dirname, "%s/", path->filename);
 		path->realpath = dirname;
@@ -868,10 +903,10 @@ filepath_ensure_directories_exist(Path *path, mode_t mode)
 	}
 
 	/* ok, now back to our business of creating directories */
-	sprintf(currdir, "");
-
 	for (int i = 1; i < path->nb_dirs; i++)
 	{
+		char *currdir;
+
 		/* the last entry might be NULL, and that's ok */
 		if (path->directories[i] == NULL)
 		{
@@ -885,7 +920,8 @@ filepath_ensure_directories_exist(Path *path, mode_t mode)
 			}
 		}
 
-		sprintf(currdir, "%s/%s", currdir, path->directories[i]);
+		appendPQExpBuffer(fn, "/%s", path->directories[i]);
+		currdir = fn->data;
 
 		if (mkdir(currdir, mode) == -1)
 		{
@@ -928,6 +964,8 @@ filepath_ensure_directories_exist(Path *path, mode_t mode)
 			}
 		}
 	}
+	destroyPQExpBuffer(fn);
+
 	filepath_refresh_stats(path);
 	return true;
 }
@@ -1026,7 +1064,7 @@ filepath_list_new(const char *list)
 		strncpy(entry, previous, size);
 		entry[size] = '\0';
 
-		plist->list[i++] = filepath_new(entry);
+		plist->list[i++] = filepath_newdir(entry);
 
 		previous = ++ptr;
 	}

@@ -3,6 +3,7 @@ PG_CONFIG ?= pg_config
 
 CFLAGS  = -std=c99 -D_GNU_SOURCE -O0 -g
 CFLAGS += -I $(shell $(PG_CONFIG) --includedir)
+CFLAGS += $(shell $(PG_CONFIG) --cflags)
 
 all: foo ;
 
