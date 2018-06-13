@@ -59,6 +59,7 @@ void filepath_fprintf(FILE *stream, Path *path);
 
 Path *filepath_cwd(void);
 Path *filepath_join(Path *path, const char *filename);
+Path *filepath_join_subdir(Path *path, const char *subdir);
 Path *filepath_merge(Path *specs, Path *defaults);
 Path *filepath_merge_filename(const char *filename, Path *defaults);
 Path *filepath_with_extension(Path *path, const char *extension);
@@ -179,6 +180,13 @@ filepath_normalize_directory(Path *path)
 		return;
 	}
 
+	/*
+	 * Prepare our own internal to this function version of the realpath, with
+	 * an extra slash at the end of a directory's name, to ease with the
+	 * splitting.
+	 */
+	realpath = NULL;
+
 	if (path->realpath != NULL && path->st != NULL)
 	{
 		is_dir = S_ISDIR(path->st->st_mode);
@@ -226,14 +234,20 @@ filepath_normalize_directory(Path *path)
 		 * know that already, but double-slashes are going to be a problem
 		 * going forward(-slash).
 		 */
-		int f_i, r_i;
+		int f_i = 0, c_i = 0;
 		int len = strlen(path->filename) + 1;
 		char previous = '\0';
+		bool spec_is_absolute = len > 1 && path->filename[0] == '/';
 
-		realpath = (char *) malloc(len * sizeof(char));
-		realpath[len-1] = '\0';
+		/* parse tokens in filename, and keep directories */
+		char token[PATH_MAX];
+		char **directories = (char **) malloc((len/2) * sizeof(char *));
+		int d_i = 0;
 
-		for (f_i = 0, r_i = 0; f_i < len; previous = path->filename[f_i++])
+		/* to build our realpath, we use a buffer */
+		PQExpBuffer fn;
+
+		for (; f_i < len; previous = path->filename[f_i++])
 		{
 			char current = path->filename[f_i];
 
@@ -242,13 +256,87 @@ filepath_normalize_directory(Path *path)
 				/* just skip it */
 				continue;
 			}
+			else if (current == '/')
+			{
+				/* that's a separator, not part of any token */
+				char *dir;
+				token[c_i] = '\0';
+				dir = strdup(token);
+				c_i = 0;
+
+				if (streq(dir, ".."))
+				{
+					/*
+					 * Normalize .. in given path. Not the same processing when
+					 * given an absolute file specification (begins with "/")
+					 * or a relative one.
+					 *
+					 * It's not possible to get back from /, so / and /.. and
+					 * /../../.. are the same path, they all are / actually.
+					 */
+					if (spec_is_absolute)
+					{
+						if (d_i == 1)
+						{
+							/* /.. is the same same as / */
+							continue;
+						}
+						else
+						{
+							/* we have /foo/bar/.. and we don't increment d_i */
+							d_i--;
+						}
+					}
+					else
+					{
+						/* we have ./foo/bar/.., or maybe even ../ */
+						if (d_i == 0
+							|| (d_i > 0 && streq(directories[d_i-1], "..")))
+						{
+							directories[d_i++] = strdup(dir);
+						}
+						else
+						{
+							/* previous directory wasn't a .. */
+							d_i--;
+						}
+					}
+				}
+				else if (streq(dir, "") && d_i == 0)
+				{
+					directories[d_i++] = "/";
+				}
+				else
+				{
+					directories[d_i++] = dir;
+				}
+			}
 			else
 			{
-				/* we keep it */
-				realpath[r_i++] = current;
+				token[c_i++] = current;
 			}
 		}
+
+		fn = createPQExpBuffer();
+
+		for (int i = 0; i < d_i; i++)
+		{
+			if (i == 0 && streq(directories[i], "/"))
+			{
+				appendPQExpBufferStr(fn, "/");
+			}
+			else
+			{
+				appendPQExpBuffer(fn, "%s/", directories[i]);
+			}
+		}
+		appendPQExpBufferStr(fn, token);
+
+		realpath = strdup(fn->data);
 		path->realpath = strdup(realpath);
+
+		destroyPQExpBuffer(fn);
+		free(directories);
 	}
 
 	/* now, compute directories */
@@ -455,23 +543,23 @@ filepath_sprintf(char *dest, Path *path)
 
 	if (path->realpath != NULL)
 	{
-		for (int i = 1; i < path->nb_dirs; i++)
+		for (int i = 0; i < path->nb_dirs; i++)
 		{
 			char *dir = path->directories[i];
 
-			if (dir != NULL)
+			if (i == 0 && streq("/", dir))
 			{
-				appendPQExpBuffer(fn, "/%s", dir);
+				appendPQExpBufferStr(fn, "/");
 			}
-			else
+			else if (dir != NULL)
 			{
-				appendPQExpBuffer(fn, "/");
+				appendPQExpBuffer(fn, "%s/", dir);
 			}
 		}
 
 		if (path->name != NULL)
 		{
-			appendPQExpBuffer(fn, "/%s", path->name);
+			appendPQExpBuffer(fn, "%s", path->name);
 
 			if (path->extension != NULL)
 			{
@@ -510,16 +598,23 @@ filepath_get_filename(Path *path)
 void
 filepath_fprintf(FILE *stream, Path *path)
 {
-	if (path->realpath)
+	if (path->realpath != NULL)
 	{
 		for (int i = 0; i < path->nb_dirs; i++)
 		{
 			/* when path doesn't exists and ends with a slash */
 			if (path->directories[i] != NULL)
 			{
-				char *fmt = i == 0 ? "%s" : "%s/";
+				char *dir = path->directories[i];
 
-				fprintf(stream, fmt, path->directories[i]);
+				if (i == 0 && streq("/", dir))
+				{
+					fprintf(stream, "/");
+				}
+				else
+				{
+					fprintf(stream, "%s/", dir);
+				}
 			}
 		}
 
@@ -628,6 +723,39 @@ filepath_join(Path *path, const char *filename)
 
 
 /*
+ * Create a subdirectory in given Path, which must be a directory already.
+ */
+Path *
+filepath_join_subdir(Path *path, const char *subdir)
+{
+	Path *result = NULL;
+	PQExpBuffer fn;
+
+	fn = createPQExpBuffer();
+
+	appendPQExpBufferStr(fn, path->filename);
+
+	if (!filename_ends_with_slash(path->filename))
+	{
+		appendPQExpBufferStr(fn, "/");
+	}
+
+	appendPQExpBufferStr(fn, subdir);
+
+	if (!filename_ends_with_slash(subdir))
+	{
+		appendPQExpBufferStr(fn, "/");
+	}
+
+	result = filepath_new(fn->data);
+
+	destroyPQExpBuffer(fn);
+
+	return result;
+}
+
+
+/*
  * Merge filepath specifications into defaults. Any parts that are left empty
  * in the specs are taken from the defaults instead.
  *
@@ -640,7 +768,7 @@ filepath_merge(Path *specs, Path *defaults)
 	Path *merge;
 	Path *pieces = (Path *) malloc(sizeof(Path));
 
-	if (specs->nb_dirs > 0)
+	if ((specs->exists || !defaults->exists) && specs->nb_dirs > 0)
 	{
 		pieces->nb_dirs = specs->nb_dirs;
 		pieces->directories = specs->directories;
@@ -726,6 +854,7 @@ filepath_relative_filename(Path *path, Path *maybe_root)
 {
 	int common_subdirs_count = 0;
 	char *relpath;
+	PQExpBuffer fn;
 
 	/*
 	 * Ok this only works with Path that exist and that we know the full
@@ -755,7 +884,7 @@ filepath_relative_filename(Path *path, Path *maybe_root)
 	/*
 	 * Time to allocate our answer.
 	 */
-	relpath = (char *) malloc(PATH_MAX * sizeof(char));
+	fn = createPQExpBuffer();
 
 	/*
 	 * If path is contained within maybe_root, that's easy, produce:
@@ -763,12 +892,12 @@ filepath_relative_filename(Path *path, Path *maybe_root)
 	 */
 	if (common_subdirs_count == maybe_root->nb_dirs)
 	{
-		sprintf(relpath, ".");
+		appendPQExpBufferStr(fn, ".");
 
 		/* skip the maybe_root directories */
 		for(int i = maybe_root->nb_dirs; i < path->nb_dirs; i++)
 		{
-			sprintf(relpath, "%s/%s", relpath, path->directories[i]);
+			appendPQExpBuffer(fn, "/%s", path->directories[i]);
 		}
 	}
 	else
@@ -779,11 +908,11 @@ filepath_relative_filename(Path *path, Path *maybe_root)
 		 */
 		int stepback = maybe_root->nb_dirs - common_subdirs_count - 1;
 
-		sprintf(relpath, "..");
+		appendPQExpBufferStr(fn, "..");
 
 		for (int i = 0; i < stepback ; i++)
 		{
-			sprintf(relpath, "../%s", relpath);
+			appendPQExpBufferStr(fn, "/..");
 		}
 
 		/*
@@ -791,7 +920,7 @@ filepath_relative_filename(Path *path, Path *maybe_root)
 		 */
 		for (int i = common_subdirs_count; i < path->nb_dirs; i++)
 		{
-			sprintf(relpath, "%s/%s", relpath, path->directories[i]);
+			appendPQExpBuffer(fn, "/%s", path->directories[i]);
 		}
 	}
 
@@ -800,13 +929,16 @@ filepath_relative_filename(Path *path, Path *maybe_root)
 	 */
 	if (path->name != NULL)
 	{
-		sprintf(relpath, "%s/%s", relpath, path->name);
+		appendPQExpBuffer(fn, "/%s", path->name);
 
 		if (path->extension != NULL)
 		{
-			sprintf(relpath, "%s.%s", relpath, path->extension);
+			appendPQExpBuffer(fn, ".%s", path->extension);
 		}
 	}
+	relpath = strdup(fn->data);
+	destroyPQExpBuffer(fn);
+
 	return relpath;
 }
 

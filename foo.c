@@ -30,11 +30,13 @@ static void main_env_set(int argc, char **argv);
 static void main_path_ls(int argc, char **argv);
 static void main_path_ext(int argc, char **argv);
 static void main_path_join(int argc, char **argv);
+static void main_path_joindir(int argc, char **argv);
 static void main_path_merge(int argc, char **argv);
 static void main_path_rel(int argc, char **argv);
 static void main_path_mkdirs(int argc, char **argv);
 static void main_path_rmdir(int argc, char **argv);
 static void main_path_find(int argc, char **argv);
+static void main_path_abs(int argc, char **argv);
 
 static void main_ls(int argc, char **argv);
 static int ls_getopt(int argc, char **argv);
@@ -79,6 +81,12 @@ cmd_t path_cmd_join = make_command("join",
 								   NULL,
 								   NULL, &main_path_join);
 
+cmd_t path_cmd_joindir = make_command("joindir",
+									  "join file paths to make a subdirectory",
+									  "<dir a> <subdir>",
+									  NULL,
+									  NULL, &main_path_joindir);
+
 cmd_t path_cmd_merge = make_command("merge",
 								   "merge file paths",
 									"<specs> <defaults>",
@@ -109,15 +117,23 @@ cmd_t path_cmd_find = make_command("find",
 								   NULL,
 								   NULL, &main_path_find);
 
+cmd_t path_cmd_abs = make_command("abs",
+								  "get absolute filename",
+								  "<filename>",
+								  NULL,
+								  NULL, &main_path_abs);
+
 cmd_t *path_cmds[] = {
   &path_cmd_ls,
   &path_cmd_ext,
   &path_cmd_join,
+  &path_cmd_joindir,
   &path_cmd_merge,
   &path_cmd_rel,
   &path_cmd_mkdirs,
   &path_cmd_rmdir,
   &path_cmd_find,
+  &path_cmd_abs,
   NULL
 };
 
@@ -299,7 +315,7 @@ main_path_ext(int argc, char **argv)
 	}
 	else
 	{
-		commandline_print_usage(&path_cmd_join, stderr);
+		commandline_print_usage(&path_cmd_ext, stderr);
 		exit(1);
 	}
 	return;
@@ -332,6 +348,40 @@ main_path_join(int argc, char **argv)
 	else
 	{
 		commandline_print_usage(&path_cmd_join, stderr);
+		exit(1);
+	}
+	return;
+}
+
+
+static void
+main_path_joindir(int argc, char **argv)
+{
+	if (argc == 2)
+	{
+		Path *path = filepath_new(argv[0]);
+		Path *join = filepath_join_subdir(path, argv[1]);
+
+		printf("  file a: %s\n", filepath_get_filename(path));
+		printf("  file b: %s\n", argv[1]);
+		printf("filename: %s\n", join->filename);
+		printf("realpath: %s\n", join->realpath);
+		printf("    name: %s\n", join->name);
+		printf("    .ext: %s\n", join->extension);
+		printf("    stat: %s\n", join->exists ? "exists" : "does not exists");
+		printf("  is dir: %s\n", filepath_is_dir(join) ? "yes" : "no");
+		printf("\n");
+		filepath_fprintf(stdout, join);
+		printf("\n\n");
+
+		filepath_free(path);
+		filepath_free(join);
+
+		return;
+	}
+	else
+	{
+		commandline_print_usage(&path_cmd_joindir, stderr);
 		exit(1);
 	}
 	return;
@@ -492,6 +542,53 @@ main_path_find(int argc, char **argv)
 }
 
 
+static void
+main_path_abs(int argc, char **argv)
+{
+	if (argc == 1)
+	{
+		Path *p = filepath_new(argv[0]);
+		const char *pathname;
+
+		if (filepath_file_exists(p))
+		{
+			pathname = filepath_get_filename(p);
+		}
+		else if (filepath_is_absolute(p))
+		{
+			pathname = p->filename;
+		}
+		else
+		{
+			Path *cwd = filepath_cwd();
+			Path *new = filepath_merge(p, cwd);
+
+			pathname = filepath_get_filename(new);
+
+			filepath_free(cwd);
+			filepath_free(new);
+		}
+
+		printf("filename: %s\n", p->filename);
+		printf("realpath: %s\n", p->realpath);
+		printf("    name: %s\n", p->name);
+		printf("    .ext: %s\n", p->extension);
+		printf("    stat: %s\n", p->exists ? "exists" : "does not exists");
+		printf("  is dir: %s\n", filepath_is_dir(p) ? "yes" : "no");
+		printf("\n");
+		printf("%s\n\n", pathname);
+
+		filepath_free(p);
+	}
+	else
+	{
+		commandline_print_usage(&path_cmd_rmdir, stderr);
+		exit(1);
+	}
+	return;
+}
+
+
 /*
  * foo ls
  *
@@ -592,9 +689,17 @@ main_which(int argc, char **argv)
 			fflush(stderr);
 			exit(1);
 		}
-		fprintf(stdout, "%p %ld\n", prog.out, strlen(prog.out));
-		fprintf(stdout, "%s", prog.out);
-		fprintf(stderr, "%s", prog.err);
+		fprintf(stdout, "main_which: %p %ld\n", prog.out, strlen(prog.out));
+
+		if (prog.out != NULL)
+		{
+			fprintf(stdout, "%s\n", prog.out);
+		}
+
+		if (prog.err != NULL)
+		{
+			fprintf(stderr, "%s\n", prog.err);
+		}
 
 		fflush(stdout);
 		fflush(stderr);
@@ -674,8 +779,15 @@ main_echo12(int argc, char **argv)
 			exit(1);
 		}
 
-		fprintf(stdout, "%s", prog.out);
-		fprintf(stderr, "%s", prog.err);
+		if (prog.out != NULL)
+		{
+			fprintf(stdout, "%s\n", prog.out);
+		}
+
+		if (prog.err != NULL)
+		{
+			fprintf(stderr, "%s\n", prog.err);
+		}
 
 		fflush(stdout);
 		fflush(stderr);

@@ -34,9 +34,12 @@ test-filepaths: foo tree
 	./foo path -h
 	./foo path ls foo.c
 	./foo path ls /tmp/citus-ha-keeper-tests/node_b.backup/
+	./foo path abs /tmp/citus-ha-keeper-tests/monitor
+	./foo path abs ./monitor
 	./foo path ext foo.c .py
 	./foo path ext foo.c py
 	./foo path join ../subcommands.c foo.c
+	./foo path joindir /tmp/citus-ha-demo/primary/data/ .backup
 	./foo path merge bar.baz ./
 	./foo path rel ./foo.c ../../..
 	./foo path rmdir $(TESTDIR)
