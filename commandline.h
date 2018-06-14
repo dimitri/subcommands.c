@@ -84,6 +84,15 @@ commandline_run(cmd_t *command, int argc, char **argv)
     {
 		return command->run(argc, argv);
     }
+	else if (argc == 0)
+	{
+		/*
+		 * We're at the end of the command line already, and command->run is
+		 * not set, which means we expected a subcommand to be used, but none
+		 * have been given by the user. Inform him.
+		 */
+		commandline_print_subcommands(command, stderr);
+	}
 	else
     {
 		if (command->subcommands != NULL)
@@ -101,12 +110,15 @@ commandline_run(cmd_t *command, int argc, char **argv)
             }
 
 			/* if we reach this code, we didn't find a subcommand */
-			fprintf(stderr, "%s: incomplete command\n", argv0);
-			fflush(stderr);
+			{
+				const char *bc =
+					command->breadcrumb == NULL ? argv0 : command->breadcrumb;
+
+				fprintf(stderr, "%s: %s: unknown command\n", bc, argv[0]);
+			}
 
 			fprintf(stderr, "\n");
 			commandline_print_subcommands(command, stderr);
-			fflush(stderr);
         }
     }
 	return;
@@ -119,7 +131,10 @@ commandline_run(cmd_t *command, int argc, char **argv)
 void
 commandline_print_usage(cmd_t *command, FILE *stream)
 {
-	fprintf(stream, "%s:", command->breadcrumb);
+	const char *breadcrumb =
+		command->breadcrumb == NULL ? command->name : command->breadcrumb;
+
+	fprintf(stream, "%s:", breadcrumb);
 
 	if (command->short_desc)
 	{
@@ -130,7 +145,7 @@ commandline_print_usage(cmd_t *command, FILE *stream)
 	if (command->usage_suffix)
 	{
 		fprintf(stream,
-				"usage: %s %s\n", command->breadcrumb, command->usage_suffix);
+				"usage: %s %s\n", breadcrumb, command->usage_suffix);
 		fprintf(stream, "\n");
 	}
 
