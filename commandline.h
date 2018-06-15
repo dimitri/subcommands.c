@@ -28,6 +28,8 @@ struct command_line
 	char *breadcrumb;
 };
 
+static cmd_t *current_command = NULL;
+
 #define make_command_set(name, desc, usage, help, getopt, set)	\
 	{name, desc, usage, help, getopt, NULL, set, NULL}
 
@@ -35,6 +37,7 @@ struct command_line
 	{name, desc, usage, help, getopt, run, NULL, NULL}
 
 void commandline_run(cmd_t *command, int argc, char **argv);
+void commandline_help(FILE *stream);
 void commandline_print_usage(cmd_t *command, FILE *stream);
 void commandline_print_subcommands(cmd_t *command, FILE *stream);
 void commandline_add_breadcrumb(cmd_t *command, cmd_t *subcommand);
@@ -82,6 +85,7 @@ commandline_run(cmd_t *command, int argc, char **argv)
 
 	if (command->run != NULL)
     {
+		current_command = command;
 		return command->run(argc, argv);
     }
 	else if (argc == 0)
@@ -121,6 +125,20 @@ commandline_run(cmd_t *command, int argc, char **argv)
 			commandline_print_subcommands(command, stderr);
         }
     }
+	return;
+}
+
+
+/*
+ * Print help message for the known currently running command.
+ */
+void
+commandline_help(FILE *stream)
+{
+	if (current_command != NULL)
+	{
+		commandline_print_usage(current_command, stream);
+	}
 	return;
 }
 

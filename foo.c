@@ -213,7 +213,7 @@ main_env_get(int argc, char **argv)
     }
 	else
 	{
-		commandline_print_usage(&env_cmd_get, stderr);
+		commandline_help(stderr);
 		exit(1);
 	}
 	return;
@@ -245,7 +245,7 @@ main_env_set(int argc, char **argv)
 	}
 	else
 	{
-		commandline_print_usage(&env_cmd_set, stderr);
+		commandline_help(stderr);
 		exit(1);
 	}
 	return;
@@ -261,7 +261,7 @@ main_path_ls(int argc, char **argv)
 {
 	if (argc == 0)
 	{
-		commandline_print_usage(&path_cmd_ls, stderr);
+		commandline_help(stderr);
 		exit(1);
 	}
 
@@ -315,7 +315,7 @@ main_path_ext(int argc, char **argv)
 	}
 	else
 	{
-		commandline_print_usage(&path_cmd_ext, stderr);
+		commandline_help(stderr);
 		exit(1);
 	}
 	return;
@@ -347,7 +347,7 @@ main_path_join(int argc, char **argv)
 	}
 	else
 	{
-		commandline_print_usage(&path_cmd_join, stderr);
+		commandline_help(stderr);
 		exit(1);
 	}
 	return;
@@ -381,7 +381,7 @@ main_path_joindir(int argc, char **argv)
 	}
 	else
 	{
-		commandline_print_usage(&path_cmd_joindir, stderr);
+		commandline_help(stderr);
 		exit(1);
 	}
 	return;
@@ -413,7 +413,7 @@ main_path_merge(int argc, char **argv)
 	}
 	else
 	{
-		commandline_print_usage(&path_cmd_merge, stderr);
+		commandline_help(stderr);
 		exit(1);
 	}
 	return;
@@ -438,7 +438,7 @@ main_path_rel(int argc, char **argv)
 	}
 	else
 	{
-		commandline_print_usage(&path_cmd_rel, stderr);
+		commandline_help(stderr);
 		exit(1);
 	}
 	return;
@@ -477,7 +477,7 @@ main_path_mkdirs(int argc, char **argv)
 	}
 	else
 	{
-		commandline_print_usage(&path_cmd_mkdirs, stderr);
+		commandline_help(stderr);
 		exit(1);
 	}
 	return;
@@ -507,7 +507,7 @@ main_path_rmdir(int argc, char **argv)
 	}
 	else
 	{
-		commandline_print_usage(&path_cmd_rmdir, stderr);
+		commandline_help(stderr);
 		exit(1);
 	}
 	return;
@@ -535,7 +535,7 @@ main_path_find(int argc, char **argv)
 	}
 	else
 	{
-		commandline_print_usage(&path_cmd_rmdir, stderr);
+		commandline_help(stderr);
 		exit(1);
 	}
 	return;
@@ -582,7 +582,7 @@ main_path_abs(int argc, char **argv)
 	}
 	else
 	{
-		commandline_print_usage(&path_cmd_rmdir, stderr);
+		commandline_help(stderr);
 		exit(1);
 	}
 	return;
@@ -637,7 +637,7 @@ ls_getopt(int argc, char **argv)
 
 	if (errors > 0)
 	{
-		commandline_print_usage(&ls_cmd, stderr);
+		commandline_help(stderr);
 		exit(1);
 	}
 	return optind;
@@ -710,7 +710,7 @@ main_which(int argc, char **argv)
 	}
 	else
 	{
-		commandline_print_usage(&which_cmd, stderr);
+		commandline_help(stderr);
 		exit(1);
 	}
 
@@ -796,7 +796,7 @@ main_echo12(int argc, char **argv)
 	}
 	else
 	{
-		commandline_print_usage(&echo_cmd, stderr);
+		commandline_help(stderr);
 		exit(1);
 	}
 
