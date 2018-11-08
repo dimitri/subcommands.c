@@ -44,139 +44,139 @@ static int ls_getopt(int argc, char **argv);
 static void main_which(int argc, char **argv);
 static void main_echo12(int argc, char **argv);
 
-cmd_t env_cmd_get = make_command("get",
-                                 "get env variable value",
-								 "<variable name>",
-								 NULL,
-                                 NULL, &main_env_get);
+CommandLine env_cmd_get = make_command("get",
+									   "get env variable value",
+									   "<variable name>",
+									   NULL,
+									   NULL, &main_env_get);
 
-cmd_t env_cmd_set = make_command("set",
-                                 "set env variable value", NULL, NULL,
-                                 NULL, &main_env_set);
+CommandLine env_cmd_set = make_command("set",
+									   "set env variable value", NULL, NULL,
+									   NULL, &main_env_set);
 
-cmd_t *env_cmds[] = {
-  &env_cmd_get,
-  &env_cmd_set,
-  NULL
+CommandLine *env_cmds[] = {
+	&env_cmd_get,
+	&env_cmd_set,
+	NULL
 };
 
-cmd_t env_cmd = make_command_set("env", "access environment", NULL, NULL,
-                                 NULL, env_cmds);
+CommandLine env_cmd = make_command_set("env", "access environment", NULL, NULL,
+									   NULL, env_cmds);
 
-cmd_t path_cmd_ls = make_command("ls",
-								 "list a filepath",
-								 "<filename> [ ... ]",
-								 NULL,
-								 NULL, &main_path_ls);
+CommandLine path_cmd_ls = make_command("ls",
+									   "list a filepath",
+									   "<filename> [ ... ]",
+									   NULL,
+									   NULL, &main_path_ls);
 
-cmd_t path_cmd_ext = make_command("ext",
-								  "change extension of a filepath",
-								  "<filename> <extension>",
-								  NULL,
-								  NULL, &main_path_ext);
+CommandLine path_cmd_ext = make_command("ext",
+										"change extension of a filepath",
+										"<filename> <extension>",
+										NULL,
+										NULL, &main_path_ext);
 
-cmd_t path_cmd_join = make_command("join",
-								   "join file paths",
-								   "<filename a> <filename b>",
-								   NULL,
-								   NULL, &main_path_join);
+CommandLine path_cmd_join = make_command("join",
+										 "join file paths",
+										 "<filename a> <filename b>",
+										 NULL,
+										 NULL, &main_path_join);
 
-cmd_t path_cmd_joindir = make_command("joindir",
-									  "join file paths to make a subdirectory",
-									  "<dir a> <subdir>",
-									  NULL,
-									  NULL, &main_path_joindir);
+CommandLine path_cmd_joindir = make_command("joindir",
+											"join file paths to make a subdirectory",
+											"<dir a> <subdir>",
+											NULL,
+											NULL, &main_path_joindir);
 
-cmd_t path_cmd_merge = make_command("merge",
-								   "merge file paths",
-									"<specs> <defaults>",
-									NULL,
-									NULL, &main_path_merge);
+CommandLine path_cmd_merge = make_command("merge",
+										  "merge file paths",
+										  "<specs> <defaults>",
+										  NULL,
+										  NULL, &main_path_merge);
 
-cmd_t path_cmd_rel = make_command("rel",
-								  "returns relative path from root to target",
-								  "<target> <root>",
-								  NULL,
-								  NULL, &main_path_rel);
+CommandLine path_cmd_rel = make_command("rel",
+										"returns relative path from root to target",
+										"<target> <root>",
+										NULL,
+										NULL, &main_path_rel);
 
-cmd_t path_cmd_mkdirs = make_command("mkdirs",
-									 "ensure target directory exists",
-									 "<target>",
-									 NULL,
-									 NULL, &main_path_mkdirs);
+CommandLine path_cmd_mkdirs = make_command("mkdirs",
+										   "ensure target directory exists",
+										   "<target>",
+										   NULL,
+										   NULL, &main_path_mkdirs);
 
-cmd_t path_cmd_rmdir = make_command("rmdir",
-									"delete target directory and its contents",
-									"<target>",
-									NULL,
-									NULL, &main_path_rmdir);
+CommandLine path_cmd_rmdir = make_command("rmdir",
+										  "delete target directory and its contents",
+										  "<target>",
+										  NULL,
+										  NULL, &main_path_rmdir);
 
-cmd_t path_cmd_find = make_command("find",
-								   "find all files in PATH",
-								   "<filename>",
-								   NULL,
-								   NULL, &main_path_find);
+CommandLine path_cmd_find = make_command("find",
+										 "find all files in PATH",
+										 "<filename>",
+										 NULL,
+										 NULL, &main_path_find);
 
-cmd_t path_cmd_abs = make_command("abs",
-								  "get absolute filename",
-								  "<filename>",
-								  NULL,
-								  NULL, &main_path_abs);
+CommandLine path_cmd_abs = make_command("abs",
+										"get absolute filename",
+										"<filename>",
+										NULL,
+										NULL, &main_path_abs);
 
-cmd_t *path_cmds[] = {
-  &path_cmd_ls,
-  &path_cmd_ext,
-  &path_cmd_join,
-  &path_cmd_joindir,
-  &path_cmd_merge,
-  &path_cmd_rel,
-  &path_cmd_mkdirs,
-  &path_cmd_rmdir,
-  &path_cmd_find,
-  &path_cmd_abs,
-  NULL
+CommandLine *path_cmds[] = {
+	&path_cmd_ls,
+	&path_cmd_ext,
+	&path_cmd_join,
+	&path_cmd_joindir,
+	&path_cmd_merge,
+	&path_cmd_rel,
+	&path_cmd_mkdirs,
+	&path_cmd_rmdir,
+	&path_cmd_find,
+	&path_cmd_abs,
+	NULL
 };
 
-cmd_t path_cmd = make_command_set("path", "compose path names", NULL, NULL,
-								  NULL, path_cmds);
+CommandLine path_cmd = make_command_set("path", "compose path names", NULL, NULL,
+										NULL, path_cmds);
 
-cmd_t ls_cmd = make_command("ls",
-                            "list file or directory", "[-alr]", NULL,
-                            &ls_getopt, &main_ls);
+CommandLine ls_cmd = make_command("ls",
+								  "list file or directory", "[-alr]", NULL,
+								  &ls_getopt, &main_ls);
 
-/* cmd_t cat_cmd = make_command("cat" */
+/* CommandLine cat_cmd = make_command("cat" */
 /*                              "cat file", "[-n]", NULL, */
 /*                              &cat_getopt, &main_cat); */
 
-cmd_t which_cmd = make_command("which",
-							   "run /usr/bin/which", "<program>", NULL,
-							   NULL, &main_which);
+CommandLine which_cmd = make_command("which",
+									 "run /usr/bin/which", "<program>", NULL,
+									 NULL, &main_which);
 
-cmd_t echo_cmd = make_command("echo",
-							  "run /usr/bin/echo", "<nb>", NULL,
-							  NULL, &main_echo12);
+CommandLine echo_cmd = make_command("echo",
+									"run /usr/bin/echo", "<nb>", NULL,
+									NULL, &main_echo12);
 
-cmd_t *main_cmds[] = {
-  &env_cmd,
-  &path_cmd,
-  &ls_cmd,
-  /* &cat_cmd, */
-  &which_cmd,
-  &echo_cmd,
-  NULL
+CommandLine *main_cmds[] = {
+	&env_cmd,
+	&path_cmd,
+	&ls_cmd,
+	/* &cat_cmd, */
+	&which_cmd,
+	&echo_cmd,
+	NULL
 };
 
-cmd_t main_cmd = make_command_set("foo",
-                                  "test program for subcommands.c",
-                                  NULL, NULL,
-                                  NULL, main_cmds);
+CommandLine main_cmd = make_command_set("foo",
+										"test program for subcommands.c",
+										NULL, NULL,
+										NULL, main_cmds);
 
 int
 main(int argc, char **argv)
 {
-  commandline_run(&main_cmd, argc, argv);
+	commandline_run(&main_cmd, argc, argv);
 
-  return 0;
+	return 0;
 }
 
 /*
@@ -680,7 +680,7 @@ main_which(int argc, char **argv)
 	if (argc == 1)
 	{
 		Program prog = run_program("/usr/bin/which", argv[0], NULL);
-		int rc = prog.rc;
+		int rc = prog.returnCode;
 
 		if (prog.error != 0)
 		{
@@ -689,16 +689,16 @@ main_which(int argc, char **argv)
 			fflush(stderr);
 			exit(1);
 		}
-		fprintf(stdout, "main_which: %p %ld\n", prog.out, strlen(prog.out));
+		fprintf(stdout, "main_which: %p %ld\n", prog.stdout, strlen(prog.stdout));
 
-		if (prog.out != NULL)
+		if (prog.stdout != NULL)
 		{
-			fprintf(stdout, "%s\n", prog.out);
+			fprintf(stdout, "%s\n", prog.stdout);
 		}
 
-		if (prog.err != NULL)
+		if (prog.stderr != NULL)
 		{
-			fprintf(stderr, "%s\n", prog.err);
+			fprintf(stderr, "%s\n", prog.stderr);
 		}
 
 		fflush(stdout);
@@ -779,20 +779,20 @@ main_echo12(int argc, char **argv)
 			exit(1);
 		}
 
-		if (prog.out != NULL)
+		if (prog.stdout != NULL)
 		{
-			fprintf(stdout, "%s\n", prog.out);
+			fprintf(stdout, "%s\n", prog.stdout);
 		}
 
-		if (prog.err != NULL)
+		if (prog.stderr != NULL)
 		{
-			fprintf(stderr, "%s\n", prog.err);
+			fprintf(stderr, "%s\n", prog.stderr);
 		}
 
 		fflush(stdout);
 		fflush(stderr);
 
-		exit(prog.rc);
+		exit(prog.returnCode);
 	}
 	else
 	{
