@@ -1,5 +1,5 @@
 /*
- * commandline.h, copyright Dimitri Fontaine <dim@tapoueh.org>
+ * commandline.h, copyright Citus Data, Inc.
  * License: ISC
  *
  */

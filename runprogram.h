@@ -1,5 +1,5 @@
 /*
- * runprogram.h, copyright Dimitri Fontaine <dim@tapoueh.org>
+ * runprogram.h, copyright Citus Data, Inc.
  * License: ISC
  *
  */

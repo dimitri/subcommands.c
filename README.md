@@ -11,13 +11,6 @@ A small single-file based library for common things to do in C:
 The ISC license is an Open Source license used by the OpenBSD project,
 allows users to do about whatever they want to with this code.
 
-## SDS: Simple Dynamic Strings
-
-This library vendors-in the SDS library for dynamic string handling in C.
-The SDS lib is available with a BSD-2-Clause licence.
-
-  https://github.com/antirez/sds
-
 ## commandline.h
 
 A single-file C library to implement command line parsing with commands and
@@ -34,12 +27,20 @@ License: ISC, https://en.wikipedia.org/wiki/ISC_license
 
 Expose an API to process Unix file paths.
 
-## exec.c
+## runprogram.h
 
-Use posix API to run commands: fork, exec, pipes. Allows to get stdout and
-stderr of subprocesses. Only synchronous calls implemented in this small
-single-file lib.
+A single-file C library to implement running subprograms and capturing their
+output, in a safe way, with multiple pipes: both standard output and
+standard error are captured. It should be trivial, and it still requires
+more effort than most would like to put in.
 
 ## foo.c
 
 A small example program that shows the API from the previous three libs.
+
+
+## pqexpbuffer
+
+This PostgreSQL facility provides a nice wrapper around dynamic allocation
+of string buffers and is vendored-in here. The PostgreSQL License and the
+ISC License are compatible, making that possible.

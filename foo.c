@@ -1,5 +1,5 @@
 /*
- * subcommands.c, copyright Dimitri Fontaine <dim@tapoueh.org>
+ * subcommands.c, copyright Citus Data, Inc.
  * License: ISC
  *
  * Example program.
